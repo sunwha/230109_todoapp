@@ -5,6 +5,8 @@ app.use(bodyParser.urlencoded({ extended: true }));
 const MongoClient = require('mongodb').MongoClient;
 app.set('view engine', 'ejs');
 
+app.use(express.static('public'));
+
 var db;
 MongoClient.connect('mongodb+srv://sona:sunwha7717@cluster0.fgghxz4.mongodb.net/?retryWrites=true&w=majority', function (error, client) {
   if (error) return console.log(error);
@@ -21,11 +23,11 @@ MongoClient.connect('mongodb+srv://sona:sunwha7717@cluster0.fgghxz4.mongodb.net/
 
   app.post('/add', function (req, res) {
     res.send("전송완료");
-    db.collection('counter').findOne({ name: '개시물갯수'}, function(error, result){
+    db.collection('counter').findOne({ name: '개시물갯수' }, function (error, result) {
       let totalCount = result.totalPost;
-      db.collection('post').insertOne({ _id: totalCount + 1, title: req.body.title, date: req.body.date, detail: req.body.detail }, function(error, result){
+      db.collection('post').insertOne({ _id: totalCount + 1, title: req.body.title, date: req.body.date, detail: req.body.detail }, function (error, result) {
         console.log('저장완료');
-        db.collection('counter').updateOne({ name: '개시물갯수' }, { $inc : { totalPost: 1 }}, function(){
+        db.collection('counter').updateOne({ name: '개시물갯수' }, { $inc: { totalPost: 1 } }, function () {
         })
       });
     });
@@ -33,16 +35,30 @@ MongoClient.connect('mongodb+srv://sona:sunwha7717@cluster0.fgghxz4.mongodb.net/
 });
 
 app.get('/', function (req, res) {
-  res.sendFile(__dirname + '/index.html');
+  res.render('home.ejs')
 });
 
 app.get('/write', function (req, res) {
-  res.sendFile(__dirname + '/write.html');
+  res.render('write.ejs')
 });
 
-app.get('/list', function(req, res){
-  db.collection('post').find().toArray(function(error, result){
-    console.log(result)
+app.get('/list', function (req, res) {
+  db.collection('post').find().toArray(function (error, result) {
     res.render('list.ejs', { posts: result });
   });
 });
+
+app.get('/detail/:id', function (req, res) {
+  db.collection('post').findOne({ _id: parseInt(req.params.id) }, function (error, result) {
+    console.log(result)
+    res.render('detail.ejs', { data: result });
+  })
+});
+
+app.delete('/delete', function(req, res){
+  req.body._id = parseInt(req.body._id);
+  db.collection('post').deleteOne(req.body, function(error, result){
+    console.log("삭제완료");
+    res.status(200).send({ message: "삭제에 성공했습니다"});
+  })
+})
