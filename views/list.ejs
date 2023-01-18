@@ -16,33 +16,49 @@
 
     <div class="container mt-5">
       <h2>네가 기록한 할 일 리스트</h2>
-      <ul class="mb-2 mt-5">
+      <div class="list-group">
         <% for(let i = 0; i < posts.length; i++) { %>
-          <li class="li">
-              <a href="/detail/<%= posts[i]._id %>">
-                <h3 class="mb-0"><%= posts[i].title %></h3>
-                <div class="mb-1 text-muted">할일 마감날짜: <%= posts[i].date %></div>
-              </a>
-              <a class="delete" data-index="<%= posts[i]._id %>">삭제</a>
-          </li>
+          <div class="list-group-item list-group-item-action">
+            <div class="d-flex w-100 justify-content-between flex-wrap">
+              <small class="text-left w-100 mb-1">글번호: <%= posts[i]._id %></small>
+              <a href="/detail/<%= posts[i]._id %>" class="w-70"><h5 class="mb-1"><%= posts[i].title %></h5></a>
+              <small class="text-right w-30 mb-1">할일 마감날짜: <%= posts[i].date %></small>
+              <div class="w-100 mt-3">
+                <button class="btn btn-outline-dark btn-sm float-right delete ml-1" data-del-index="<%= posts[i]._id %>">삭제</button>
+                <button class="btn btn-outline-danger btn-sm float-right edit" data-edit-index="<%= posts[i]._id %>">수정</button>
+              </div>
+            </div>
+          </div>
         <% } %>
-      </ul>
+      </div>
     </div>
 
     <script src="https://code.jquery.com/jquery-3.4.1.min.js"></script>
     <script>
       $('.delete').click(function(e){
-        const id = e.target.dataset.index;
+        const id = e.target.dataset.delIndex;
         const _this = $(this);
         $.ajax({
           method : "DELETE",
           url: '/delete',
           data: {_id: id}
         }).done(function(result){
-          _this.parents('.li').fadeOut();
+          _this.parents('.list-group-item').fadeOut();
           console.log("done")
         }).fail(function(){
           console.log('실패');
+        });
+      })
+      $('.edit').click(function(e){
+        const id = e.target.dataset.editIndex;
+        $.ajax({
+          method: "GET",
+          url: '/edit/' + id,
+          data: {_id: id}
+        }).done(function(data, textStatus, xhr){
+          console.log(textStatus)
+        }).fail(function(){
+          console.log('edit 실패');
         });
       })
     </script>
