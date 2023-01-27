@@ -9,8 +9,10 @@ app.set('view engine', 'ejs');
 
 app.use(express.static('public'));
 
+require('dotenv').config();
+
 var db;
-MongoClient.connect('mongodb+srv://sona:sunwha7717@cluster0.fgghxz4.mongodb.net/?retryWrites=true&w=majority', function (error, client) {
+MongoClient.connect(process.env.DB_URL, function (error, client) {
   if (error) return console.log(error);
 
   db = client.db('todoapp');
@@ -19,29 +21,119 @@ MongoClient.connect('mongodb+srv://sona:sunwha7717@cluster0.fgghxz4.mongodb.net/
   //   console.log('저장 완료');
   // });
 
-  app.listen(8080, function () {
+  app.listen(process.env.PORT, function () {
     console.log('listening on 8080');
-  });
-
-  app.post('/add', function (req, res) {
-    res.send("전송완료");
-    db.collection('counter').findOne({ name: '개시물갯수' }, function (error, result) {
-      let totalCount = result.totalPost;
-      db.collection('post').insertOne({ _id: totalCount + 1, title: req.body.title, date: req.body.date, detail: req.body.detail }, function (error, result) {
-        console.log('저장완료');
-        db.collection('counter').updateOne({ name: '개시물갯수' }, { $inc: { totalPost: 1 } }, function () {
-        })
-      });
-    });
   });
 });
 
+
+const passport = require('passport');
+const LocalStrategy = require('passport-local');
+const session = require('express-session');
+
+// 미들웨어: 요청-응답 중간에 뭔가 실행되는 코드
+app.use(session({secret: 'secretcode', resave: true, saveUninitialized: false}));
+app.use(passport.initialize());
+app.use(passport.session());
+
+app.get('/login', function(req, res){
+  res.render('login.ejs');
+})
+
+app.get('/fail', function(req, res){
+  res.render('fail.ejs');
+})
+
+app.post('/login', passport.authenticate('local', {
+  failureRedirect : '/fail'
+}), function(req, res){
+  res.redirect('/');
+})
+
+// 로그인시 계정 확인
+passport.use(new LocalStrategy({
+  usernameField: 'id',
+  passwordField: 'pw',
+  session: true,
+  passReqToCallback: false,
+}, function (userid, userpw, done) {
+  db.collection('login').findOne({ id: userid }, function (error, result) {
+    if (error) return done(error)
+
+    if (!result) return done(null, false, { message: 'Incorrect id' })
+    if (userpw == result.pw) {
+      return done(null, result)
+    } else {
+      return done(null, false, { message: 'Incorrect password' })
+    }
+  })
+}));
+
+// serializeUser : 사용자 정보 객체를 세션에 아이디로 저장
+passport.serializeUser(function(user, done){
+  done(null, user.id);
+});
+// deserializeUser: 세션에 저장한 아이디를 통해서 사용자 정보 객체를 불러옴
+passport.deserializeUser(function(id, done){ // serializeUser 에 저장했던 id를 받음
+  db.collection('login').findOne({id: id}, function(err, result){
+    done(null, result);
+  })
+});
+
+app.get('/logout', function(req, res, next){
+  // req.logout(function(err){
+  //   if(err) return next(err)
+  //   res.redirect('/');
+  // })
+  req.session.destroy(function(err){
+    if(err) return next(err)
+    res.redirect('/');
+  })
+})
+
+app.use(function(req, res, next){
+  res.locals.login = req.isAuthenticated();
+  if(req.session.passport) res.locals.name = req.user.id;
+  next();
+})
+
+app.get('/mypage', validLogin, function(req, res){
+  res.render('mypage.ejs', { myuser: req.user.id });
+})
+
+function validLogin(req, res, next){
+  if(req.user){
+    next()
+  } else {
+    res.send('Please sign in.')
+  }
+}
+
+app.get('/join', function(req, res){
+  res.render('join.ejs');
+  // db.collection('login').findOne({ id: req.body.new_id }, function (error, result) {
+  //   if(result != null) {
+  //     res.render('join.ejs', { data: result });
+  //   } else {
+  //     res.render('join.ejs', { error: 'your id is already registered'});
+  //     console.log('alreay')
+  //   }
+  // });
+})
+
+app.post('/join', function(req, res){
+  db.collection('login').insertOne({ id: req.body.new_id, pw: req.body.new_pw }, function (error, result) {
+    console.log('가입완료');
+    res.redirect('/login');
+  });
+})
+
 app.get('/', function (req, res) {
-  res.render('home.ejs')
+  res.render('home.ejs');
 });
 
 app.get('/write', function (req, res) {
-  res.render('write.ejs')
+  res.render('write.ejs');
 });
 
 app.get('/list', function (req, res) {
@@ -64,11 +156,23 @@ app.delete('/delete', function(req, res){
   })
 });
 
-app.get('/edit/:id', function (req, res) {
-  console.log(req.body.id)
-  db.collection('post').findOne({ _id: parseInt(req.body.id) }, function(error, result){
-    res.render('edit.ejs', { data: result });
+app.post('/add', function (req, res) {
+  // res.send("전송완료");
+  res.redirect('/list');
+  db.collection('counter').findOne({ name: '개시물갯수' }, function (error, result) {
+    let totalCount = result.totalPost;
+    db.collection('post').insertOne({ _id: totalCount + 1, title: req.body.title, date: req.body.date, detail: req.body.detail }, function (error, result) {
+      console.log('저장완료');
+      db.collection('counter').updateOne({ name: '개시물갯수' }, { $inc: { totalPost: 1 } }, function () {
+      })
+    });
   });
+});
+
+app.get('/edit/:id', function (req, res) {
+  db.collection('post').findOne({ _id: parseInt(req.params.id) }, function(error, result){
+    res.render('edit.ejs', { data: result });
+  })
 });
 
 app.put('/edit', function(req, res) {
@@ -77,3 +181,4 @@ app.put('/edit', function(req, res) {
     res.redirect('/list');
   })
 });
+
